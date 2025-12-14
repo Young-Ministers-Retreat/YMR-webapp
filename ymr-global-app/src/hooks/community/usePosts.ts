@@ -28,6 +28,7 @@ export function usePosts(groupId?: string) {
           *,
           users!posts_user_id_fkey(id, full_name, avatar_url)
         `)
+        .order('is_pinned', { ascending: false, nullsFirst: false }) // Pinned posts first
         .order('created_at', { ascending: false });
 
       if (groupId) {

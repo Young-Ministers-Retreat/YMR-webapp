@@ -13,43 +13,32 @@ import {
   Play,
   Music,
   Heart,
-  ArrowRight
+  ArrowRight,
+  Loader2
 } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { DailyInspiration } from '@/components/daily-inspiration'
 
-// --- Mock Data ---
+// --- Types ---
+interface Sermon {
+  id: string
+  title: string
+  description: string | null
+  media_url: string
+  thumbnail_url: string | null
+  published_at: string
+  created_at: string
+  is_live: boolean
+}
+
+// --- Static Data ---
 const CATEGORIES = [
   { id: 'sermons', label: 'Sermons', icon: Video, color: 'text-blue-400', bg: 'bg-blue-400/10' },
   { id: 'worship', label: 'Worship', icon: Music, color: 'text-purple-400', bg: 'bg-purple-400/10' },
   { id: 'bible', label: 'Bible Study', icon: BookOpenText, color: 'text-green-400', bg: 'bg-green-400/10' },
   { id: 'events', label: 'Events', icon: Calendar, color: 'text-orange-400', bg: 'bg-orange-400/10' },
   { id: 'groups', label: 'Groups', icon: Users2, color: 'text-pink-400', bg: 'bg-pink-400/10' },
-]
-
-const TRENDING_VIDEOS = [
-  {
-    id: 1,
-    title: "Walking in Divine Purpose",
-    preacher: "P. Daniel Olawande",
-    views: "2.4k views",
-    thumbnail: "https://images.unsplash.com/photo-1493612276216-ee3925520721?w=800&auto=format&fit=crop"
-  },
-  {
-    id: 2,
-    title: "Understanding The Times",
-    preacher: "YMR 2024",
-    views: "1.8k views",
-    thumbnail: "https://images.unsplash.com/photo-1470229722913-7ea0386db909?w=800&auto=format&fit=crop"
-  },
-  {
-    id: 3,
-    title: "The Power of Prayer",
-    preacher: "Minister Theophilus",
-    views: "3.1k views",
-    thumbnail: "https://images.unsplash.com/photo-1438232992991-995b7058bbb3?w=800&auto=format&fit=crop"
-  }
 ]
 
 const COMMUNITIES = [
@@ -61,6 +50,8 @@ const COMMUNITIES = [
 export default function DiscoverPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [userAvatar, setUserAvatar] = useState<string | null>(null)
+  const [sermons, setSermons] = useState<Sermon[]>([])
+  const [sermonsLoading, setSermonsLoading] = useState(true)
 
   useEffect(() => {
     const getUser = async () => {
@@ -71,7 +62,35 @@ export default function DiscoverPage() {
       }
     }
     getUser()
+    fetchSermons()
   }, [])
+
+  const fetchSermons = async () => {
+    try {
+      setSermonsLoading(true)
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('content')
+        .select('*')
+        .eq('type', 'sermon')
+        .order('is_live', { ascending: false })
+        .order('published_at', { ascending: false })
+        .limit(8)
+
+      if (error) throw error
+      setSermons(data || [])
+    } catch (err) {
+      console.error('Error fetching sermons:', err)
+    } finally {
+      setSermonsLoading(false)
+    }
+  }
+
+  const getYouTubeThumbnail = (url: string) => {
+    const videoId = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&?]+)/)?.[1]
+    return videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : null
+  }
+
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -128,34 +147,75 @@ export default function DiscoverPage() {
           </div>
           
           <div className="overflow-x-auto -mx-4 px-4 pb-4 scrollbar-hide">
-            <div className="flex gap-4">
-              {TRENDING_VIDEOS.map(video => (
-                <div key={video.id} className="w-[280px] shrink-0 group cursor-pointer">
-                  <div className="relative aspect-video rounded-xl overflow-hidden mb-3">
-                    <Image 
-                      src={video.thumbnail} 
-                      alt={video.title}
-                      fill
-                      className="object-cover transition-transform duration-500 group-hover:scale-110"
-                    />
-                    <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="h-10 w-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                        <Play className="h-5 w-5 text-white fill-white" />
+            {sermonsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : sermons.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No sermons available yet.</p>
+              </div>
+            ) : (
+              <div className="flex gap-4">
+                {sermons.map(sermon => {
+                  const thumbnail = sermon.thumbnail_url || getYouTubeThumbnail(sermon.media_url)
+                  const publishedDate = new Date(sermon.published_at).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric'
+                  })
+                  
+                  return (
+                    <Link 
+                      key={sermon.id} 
+                      href={`/sermons/${sermon.id}`}
+                      className="w-[280px] shrink-0 group cursor-pointer"
+                    >
+                      <div className="relative aspect-video rounded-xl overflow-hidden mb-3">
+                        {thumbnail ? (
+                          <Image 
+                            src={thumbnail} 
+                            alt={sermon.title}
+                            fill
+                            className="object-cover transition-transform duration-500 group-hover:scale-110"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-muted flex items-center justify-center">
+                            <Play className="h-8 w-8 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="h-10 w-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                            <Play className="h-5 w-5 text-white fill-white" />
+                          </div>
+                        </div>
+                        
+                        {/* Live Badge */}
+                        {sermon.is_live && (
+                          <div className="absolute top-2 right-2 flex items-center gap-1">
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                            </span>
+                            <span className="bg-red-500/90 backdrop-blur-sm text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
+                              LIVE
+                            </span>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-sm line-clamp-1 group-hover:text-primary transition-colors">
-                      {video.title}
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {video.preacher}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
+                      <div>
+                        <h3 className="font-semibold text-sm line-clamp-1 group-hover:text-primary transition-colors">
+                          {sermon.title}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {publishedDate}
+                        </p>
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </section>
 

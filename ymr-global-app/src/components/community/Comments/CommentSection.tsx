@@ -1,9 +1,11 @@
+
 import { useComments } from '@/hooks/community/useComments';
 import { Comment } from '@/types/community';
 import { Button } from '@/components/ui/button';
 import { Loader2, Send, Image as ImageIcon, Smile, X } from 'lucide-react';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { CommentCard } from './CommentCard';
+// import { CommentInput } from './CommentInput'; // Removed
 
 interface CommentSectionProps {
     postId: string;
@@ -36,14 +38,32 @@ export function CommentSection({ postId }: CommentSectionProps) {
                 ))}
             </div>
             
-            {/* Main Comment Input */}
-            <CommentInput 
-                onSubmit={async (text, file) => {
-                    await addComment.mutateAsync({ content: text });
-                }}
-                placeholder="Write a comment..."
-            />
+            {/* Main Comment Input Removed - moved to PostCard */}
         </div>
+    );
+}
+
+
+// Helper for auto-resize textarea
+function AutoResizeTextarea({ value, onChange, placeholder, autoFocus, onKeyDown }: any) {
+    const ref = useRef<HTMLTextAreaElement>(null);
+    useEffect(() => {
+        if (ref.current) {
+            ref.current.style.height = 'auto';
+            ref.current.style.height = ref.current.scrollHeight + 'px';
+        }
+    }, [value]);
+    return (
+        <textarea
+            ref={ref}
+            value={value}
+            onChange={onChange}
+            placeholder={placeholder}
+            autoFocus={autoFocus}
+            onKeyDown={onKeyDown}
+            className="w-full resize-none bg-transparent outline-none text-sm placeholder:text-neutral-400 min-h-[40px] max-h-[200px] overflow-y-auto"
+            rows={1}
+        />
     );
 }
 
@@ -62,6 +82,29 @@ function Thread({
     onCancelReply: () => void
 }) {
     const { addComment } = useComments(postId);
+    const [replyText, setReplyText] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Initialize reply text when this thread becomes active
+    useEffect(() => {
+        if (activeReplyId === comment.id) {
+            setReplyText(`@${comment.author.full_name} `);
+        }
+    }, [activeReplyId, comment.id, comment.author.full_name]);
+
+    const handleSubmit = async () => {
+        if (!replyText.trim()) return;
+        setIsSubmitting(true);
+        try {
+            await addComment.mutateAsync({ content: replyText, parentId: comment.id });
+            onCancelReply();
+            setReplyText('');
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     return (
         <div className="flex flex-col gap-3">
@@ -70,26 +113,54 @@ function Thread({
                 onReply={onReply} 
             />
             
-            {/* Reply Input */}
+            {/* Inline Reply Input */}
             {activeReplyId === comment.id && (
                 <div className="ml-11 mt-2 mb-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <CommentInput 
-                        initialContent={`@${comment.author.full_name} `}
-                        onSubmit={async (text, file) => {
-                            await addComment.mutateAsync({ content: text, parentId: comment.id });
-                            onCancelReply();
-                        }}
-                        placeholder={`Reply to ${comment.author.full_name}...`}
-                        isReply
-                        autoFocus
-                        onCancel={onCancelReply}
-                    />
+                    <div className="relative w-full rounded-xl border border-neutral-200 bg-white shadow-sm transition-all focus-within:border-neutral-300 focus-within:ring-1 focus-within:ring-neutral-200">
+                        <div className="p-3 pb-2">
+                             <div className="text-xs text-neutral-400 mb-1">
+                                Replying to <span className="text-blue-500 font-medium">@{comment.author.full_name}</span>
+                            </div>
+                            <AutoResizeTextarea
+                                value={replyText}
+                                onChange={(e: any) => setReplyText(e.target.value)}
+                                placeholder="Write a reply..."
+                                autoFocus
+                                onKeyDown={(e: any) => {
+                                    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                                        handleSubmit();
+                                    }
+                                }}
+                            />
+                        </div>
+                        <div className="flex items-center justify-between border-t border-neutral-100 px-2 py-1.5 bg-neutral-50/50 rounded-b-xl">
+                            <div className="flex gap-2 ml-auto">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={onCancelReply}
+                                    className="h-7 text-xs hover:bg-neutral-100 text-neutral-600"
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    onClick={handleSubmit}
+                                    disabled={!replyText.trim() || isSubmitting}
+                                    className="h-7 text-xs bg-[#2A8427] hover:bg-[#226d20] text-white gap-1.5"
+                                >
+                                    {isSubmitting && <Loader2 className="size-3 animate-spin" />}
+                                    Reply
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 
             {/* Replies */}
             {comment.replies && comment.replies.length > 0 && (
-                <div className="ml-4 pl-4 border-l-2 border-neutral-800/20 space-y-4 py-2">
+                <div className="ml-4 pl-4 border-l-2 border-neutral-100 space-y-4 py-2">
                     {comment.replies.map(reply => (
                         <Thread 
                             key={reply.id} 
@@ -103,145 +174,6 @@ function Thread({
                 </div>
             )}
         </div>
-    );
-}
-
-// ... imports
-import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-
-// ... (other components unchanged)
-
-// Reusable Rich Input Component
-function CommentInput({ 
-    onSubmit, 
-    placeholder, 
-    initialContent = '',
-    isReply = false,
-    autoFocus = false,
-    onCancel
-}: { 
-    onSubmit: (text: string, file: File | null) => Promise<void>, 
-    placeholder?: string,
-    initialContent?: string,
-    isReply?: boolean,
-    autoFocus?: boolean,
-    onCancel?: () => void
-}) {
-    const [content, setContent] = useState(initialContent);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!content.trim() && !selectedFile) return;
-
-        setIsSubmitting(true);
-        try {
-            await onSubmit(content, selectedFile);
-            setContent('');
-            setSelectedFile(null);
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files?.[0]) {
-            setSelectedFile(e.target.files[0]);
-        }
-    };
-    
-    const onEmojiClick = (emojiData: EmojiClickData) => {
-        setContent(prev => prev + emojiData.emoji);
-    };
-
-    return (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-2 bg-black/20 p-2 rounded-2xl border border-white/10 shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
-            <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder={placeholder}
-                className="w-full bg-transparent border-none focus:outline-none resize-none px-2 py-1 text-sm min-h-[40px] max-h-[120px] text-neutral-200 placeholder:text-neutral-500"
-                rows={isReply ? 2 : 1}
-                autoFocus={autoFocus}
-                onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSubmit(e);
-                    }
-                }}
-            />
-            
-            {selectedFile && (
-                <div className="relative w-fit mx-2 mb-2 group">
-                    <div className="h-16 w-16 rounded-lg border border-white/10 overflow-hidden bg-white/5">
-                        <img src={URL.createObjectURL(selectedFile)} className="h-full w-full object-cover opacity-80" alt="Preview" />
-                    </div>
-                    <button 
-                        type="button"
-                        onClick={() => setSelectedFile(null)}
-                        className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition-colors"
-                    >
-                        <X className="size-3" />
-                    </button>
-                </div>
-            )}
-
-            <div className="flex justify-between items-center px-1">
-                <div className="flex gap-1 text-neutral-500">
-                    <button 
-                        type="button" 
-                        onClick={() => fileInputRef.current?.click()}
-                        className="p-1.5 hover:bg-white/10 hover:text-neutral-300 rounded-full transition-colors"
-                    >
-                        <ImageIcon className="size-4" />
-                    </button>
-                    
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <button type="button" className="p-1.5 hover:bg-white/10 hover:text-neutral-300 rounded-full transition-colors">
-                                <Smile className="size-4" />
-                            </button>
-                        </PopoverTrigger>
-                        <PopoverContent className="p-0 border-none shadow-none bg-transparent w-auto">
-                            <EmojiPicker onEmojiClick={onEmojiClick} theme={'dark' as any} />
-                        </PopoverContent>
-                    </Popover>
-
-                    <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        className="hidden" 
-                        accept="image/*"
-                        onChange={handleFileSelect}
-                    />
-                </div>
-                
-                <div className="flex gap-2">
-                     {onCancel && (
-                        <Button 
-                            type="button" 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={onCancel}
-                            className="text-neutral-500 hover:text-neutral-300 hover:bg-white/5 h-8 text-xs"
-                        >
-                            Cancel
-                        </Button>
-                     )}
-                     <Button 
-                        type="submit" 
-                        size="sm" 
-                        disabled={!content.trim() && !selectedFile || isSubmitting} 
-                        className="rounded-full h-8 px-4 text-xs bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {isSubmitting ? <Loader2 className="size-3 animate-spin" /> : (isReply ? 'Reply' : 'Post')}
-                    </Button>
-                </div>
-            </div>
-        </form>
     );
 }
 

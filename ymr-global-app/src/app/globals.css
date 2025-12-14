@@ -171,26 +171,55 @@
   }
 }
 
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes sermonSlideIn {
+  from {
+    transform: translateX(-20px) scale(0.8);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Animation classes */
+.animate-slide-in-right {
+  animation: slideInRight 0.6s ease-out forwards;
+  animation-fill-mode: both;
+}
+
+.animate-sermon-slide-in {
+  animation: sermonSlideIn 0.5s ease-out forwards;
+  animation-fill-mode: both;
+  opacity: 0;
+}
+
 /* Custom Scrollbar */
-.scrollbar-thin {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(42, 132, 39, 0.3) transparent;
+.scrollbar-hide {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
 }
 
-.scrollbar-thin::-webkit-scrollbar {
-  width: 6px;
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }
 
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: transparent;
+/* Tiptap Placeholder */
+.tiptap p.is-empty::before {
+  color: var(--muted-foreground);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
 }
-
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background-color: rgba(42, 132, 39, 0.3);
-  border-radius: 3px;
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(42, 132, 39, 0.5);
-}
-
