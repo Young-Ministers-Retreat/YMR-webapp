@@ -4,12 +4,13 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Heart, Users, HandHeart, Calendar, Play, Users2 } from 'lucide-react'
+import { Heart, Users, HandHeart, Calendar, InboxIcon } from 'lucide-react'
 import Image from 'next/image'
 
 import Link from 'next/link'
 import { FeaturedCarousel, FeaturedCarouselSkeleton, FeaturedContent } from '@/components/featured-carousel'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { format } from 'date-fns'
 
 interface User {
   id: string
@@ -17,10 +18,19 @@ interface User {
   avatar_url?: string
 }
 
+interface UpcomingEvent {
+  id: string
+  title: string
+  start_time: string
+  location: string | null
+  image_url: string | null
+}
+
 export default function HomePage() {
   const [user, setUser] = useState<User | null>(null)
   const [greeting, setGreeting] = useState('')
   const queryClient = useQueryClient()
+  
   const { data: featuredContent = [], isLoading } = useQuery({
     queryKey: ['featured-content'],
     queryFn: async () => {
@@ -35,6 +45,27 @@ export default function HomePage() {
       return (data as FeaturedContent[]) || []
     },
     staleTime: 5 * 60 * 1000 // 5 minutes
+  })
+
+  // Fetch upcoming events from Supabase
+  const { data: upcomingEvents = [], isLoading: isLoadingEvents } = useQuery({
+    queryKey: ['upcoming-events-home'],
+    queryFn: async () => {
+      const supabase = createClient()
+      // Fetch events that start in the future
+      const { data, error } = await supabase
+        .from('events')
+        .select('id, title, start_time, location, image_url')
+        .gt('start_time', new Date().toISOString())
+        .order('start_time', { ascending: true })
+        .limit(3)
+      
+      if (error) {
+        console.error('Error fetching events:', error)
+        return []
+      }
+      return (data as UpcomingEvent[]) || []
+    }
   })
 
   useEffect(() => {
@@ -76,9 +107,6 @@ export default function HomePage() {
         },
         (payload) => {
           console.log('Featured content changed:', payload)
-          // Invalidate query to refetch
-          // access queryClient via hook if needed, or rely on auto-refetch if we configure it
-          // For now, simpler to just let it be stale or force reload if we import queryClient
         }
       )
       .subscribe()
@@ -91,8 +119,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      {/* Greeting Section */}
+      {/* Header & Greeting */}
       <section className="px-6 pt-6 pb-4">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-foreground">
@@ -128,12 +155,11 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Content Sections */}
+      {/* Content Shortcuts */}
       <section className="px-6 py-4 space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <Link href="/sermons">
             <Card className="relative border-none p-0 overflow-hidden h-40 group cursor-pointer">
-              {/* Background Image */}
               <div className="absolute inset-0">
                 <Image
                   src="/images/sermons.jpg"
@@ -141,15 +167,9 @@ export default function HomePage() {
                   fill
                   className="object-cover transition-transform duration-300 group-hover:scale-110"
                 />
-                {/* Dark overlay */}
                 <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/50 to-black/30 group-hover:from-black/70 transition-all" />
               </div>
-              
-              {/* Content */}
               <div className="relative h-full flex flex-col items-center justify-center space-y-3 p-6 z-10">
-                {/* <div className="h-12 w-12 rounded-full bg-blue-600/30 backdrop-blur-sm flex items-center justify-center border border-blue-400/30">
-                  <Play className="h-6 w-6 text-blue-400 group-hover:text-blue-300 transition-colors" />
-                </div> */}
                 <span className="text-white font-semibold text-center group-hover:text-blue-100 transition-colors">Sermons</span>
               </div>
             </Card>
@@ -157,7 +177,6 @@ export default function HomePage() {
           
           <Link href="/hub">
             <Card className="relative border-none p-0 overflow-hidden h-40 group cursor-pointer">
-              {/* Background Image */}
               <div className="absolute inset-0">
                 <Image
                   src="https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=800&auto=format&fit=crop&q=80"
@@ -165,15 +184,9 @@ export default function HomePage() {
                   fill
                   className="object-cover transition-transform duration-300 group-hover:scale-110"
                 />
-                {/* Dark overlay */}
                 <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/50 to-black/30 group-hover:from-black/70 transition-all" />
               </div>
-              
-              {/* Content */}
               <div className="relative h-full flex flex-col items-center justify-center space-y-3 p-6 z-10">
-                {/* <div className="h-12 w-12 rounded-full bg-green-600/30 backdrop-blur-sm flex items-center justify-center border border-green-400/30">
-                  <Users2 className="h-6 w-6 text-green-400 group-hover:text-green-300 transition-colors" />
-                </div> */}
                 <span className="text-white font-semibold text-center group-hover:text-green-100 transition-colors">Community</span>
               </div>
             </Card>
@@ -185,37 +198,54 @@ export default function HomePage() {
       <section className="px-6 py-4">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-foreground">Upcoming Events</h2>
-          <Button variant="link" className="text-blue-500 p-0" asChild>
-            <Link href="/events">See All</Link>
-          </Button>
+          {upcomingEvents.length > 0 && (
+            <Button variant="link" className="text-blue-500 p-0" asChild>
+              <Link href="/events">See All</Link>
+            </Button>
+          )}
         </div>
 
-        <div className="flex flex-col gap-4">
-          <Link href="/events/1">
-            <EventCard
-              title="Community Fall Festival"
-              date="Oct 28"
-              time="4:00 PM"
-              image="/event-1.jpg"
-            />
-          </Link>
-          <Link href="/events/2">
-            <EventCard
-              title="Youth Group Night"
-              date="Nov 05"
-              time="6:30 PM"
-              image="/event-2.jpg"
-            />
-          </Link>
-          <Link href="/events/3">
-            <EventCard
-              title="Leadership Summit"
-              date="Dec 10"
-              time="9:00 AM"
-              image="/event-3.jpg"
-            />
-          </Link>
-        </div>
+        {/* List of Events */}
+        {upcomingEvents.length > 0 ? (
+          <div className="flex flex-col gap-4">
+            {upcomingEvents.map((event, index) => (
+              <Link 
+                key={event.id} 
+                href={`/events/${event.id}`} 
+                className="animate-slide-in-right" 
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                <EventCard
+                  title={event.title}
+                  date={event.start_time}
+                  image={event.image_url || undefined}
+                  address={event.location || undefined}
+                />
+              </Link>
+            ))}
+          </div>
+        ) : (
+          !isLoadingEvents && (
+            <div className="bg-card/50 border border-border rounded-xl p-8 flex flex-col items-center justify-center text-center space-y-3">
+              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                 <Calendar className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">No Upcoming Events</h3>
+                <p className="text-sm text-muted-foreground mt-1">Check back later for updates.</p>
+              </div>
+              <Button variant="outline" size="sm" asChild>
+                  <Link href="/events">View Past Events</Link>
+              </Button>
+            </div>
+          )
+        )}
+        
+        {isLoadingEvents && (
+             <div className="flex flex-col gap-4">
+                 {[1, 2].map(i => <div key={i} className="h-24 bg-muted animate-pulse rounded-xl" />)}
+             </div>
+        )}
       </section>
     </div>
   )
@@ -235,40 +265,35 @@ function QuickAction({ icon: Icon, label }: { icon: React.ElementType; label: st
 function EventCard({ 
   title, 
   date, 
-  time,
-  address = 'KM 46, Ibadan Express Way, Old Auditorium'
+  image,
+  address = 'Location to be announced'
 }: { 
   title: string
   date: string
-  time: string
   image?: string
   address?: string
 }) {
-  // Parse date to show month abbreviation and day
-  const formatDateDisplay = (dateStr: string) => {
-    // If date is like "Dec 26", keep it as is
-    if (dateStr.includes(' ')) {
-      const parts = dateStr.split(' ')
+  // Safe date parsing
+  const getEventDateParts = (dateStr: string) => {
+    try {
+      const dateObj = new Date(dateStr)
+      if (isNaN(dateObj.getTime())) throw new Error('Invalid date')
       return {
-        month: parts[0].toUpperCase(),
-        day: parts[1]
+        month: format(dateObj, 'MMM').toUpperCase(),
+        day: format(dateObj, 'd')
       }
-    }
-    // Otherwise try to parse it
-    const date = new Date(dateStr)
-    return {
-      month: date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(),
-      day: date.getDate().toString()
+    } catch {
+      return { month: 'TBA', day: '--' }
     }
   }
 
-  const dateDisplay = formatDateDisplay(date)
+  const { month, day } = getEventDateParts(date)
 
   return (
     <Card className="flex flex-row items-center gap-4 p-4 border-border bg-white/10 hover:bg-white/20 transition-colors">
       <div className="h-16 w-16 rounded-lg bg-[#9FE870] flex flex-col items-center justify-center overflow-hidden shrink-0">
-        <span className="text-xs font-semibold text-[#1E3A3A]">{dateDisplay.month}</span>
-        <span className="text-2xl font-bold text-[#1E3A3A]">{dateDisplay.day}</span>
+        <span className="text-xs font-semibold text-[#1E3A3A]">{month}</span>
+        <span className="text-2xl font-bold text-[#1E3A3A]">{day}</span>
       </div>
       <div className="flex-1 min-w-0">
         <h3 className="font-semibold text-foreground truncate mb-1">{title}</h3>
@@ -277,9 +302,10 @@ function EventCard({
         </p>
       </div>
       <Button variant="ghost" size="icon">
-        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
+         <div className="h-5 w-5" /> {/* Placeholder for alignment, or use chevron */}
+         <svg className="h-5 w-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+         </svg>
       </Button>
     </Card>
   )

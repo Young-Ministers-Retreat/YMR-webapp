@@ -7,63 +7,53 @@ import { Badge } from '@/components/ui/badge'
 import { Calendar, MapPin, Clock, Share2, ArrowLeft } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
+import { useQuery } from '@tanstack/react-query'
+import { format } from 'date-fns'
 
-// Mock Data - In a real app, you'd fetch this by ID
-const EVENTS = [
-  {
-    id: '1',
-    title: 'YMR Global Retreat 2024',
-    date: 'Dec 15-18, 2024',
-    time: '9:00 AM EST',
-    location: 'Lagos, Nigeria & Online',
-    address: 'KM 46, Ibadan Express Way, Old Auditorium',
-    image: '/images/YMR1.jpg',
-    description: 'Join thousands of young ministers for a life-transforming encounter. Theme: The Burning Generation.',
-    status: 'Registration Open',
-    category: 'Featured'
-  },
-  {
-    id: '2',
-    title: 'Worship Night: Deep Calls',
-    date: 'Oct 28',
-    time: '6:00 PM EST',
-    location: 'Main Auditorium',
-    address: 'KM 46, Ibadan Express Way, Old Auditorium',
-    image: '/images/YMR2.jpg',
-    category: 'Worship',
-    description: 'An evening of powerful worship and praise.'
-  },
-  {
-    id: '3',
-    title: 'Leadership Masterclass',
-    date: 'Nov 05',
-    time: '10:00 AM EST',
-    location: 'Zoom (Online)',
-    address: 'Virtual Event - Link will be sent',
-    image: '/images/YMR 3.jpg',
-    category: 'Training',
-    description: 'Learn essential leadership skills for ministry.'
-  },
-  {
-    id: '4',
-    title: 'Community Outreach',
-    date: 'Nov 12',
-    time: '8:00 AM EST',
-    location: 'City Center',
-    address: 'City Center Plaza, Downtown',
-    image: '/images/YMR1.jpg',
-    category: 'Outreach',
-    description: 'Reach out to the community with love and service.'
-  }
-]
+interface Event {
+  id: string
+  title: string
+  description: string | null
+  start_time: string
+  end_time: string | null
+  location: string | null
+  image_url: string | null
+  status: string | null
+  is_featured: boolean
+  category: string | null
+  registration_link: string | null
+}
 
 export default function EventDetailPage() {
   const router = useRouter()
   const params = useParams()
   const eventId = params.id as string
 
-  // Simple lookup
-  const event = EVENTS.find(e => e.id === eventId)
+  const { data: event, isLoading } = useQuery({
+    queryKey: ['event', eventId],
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('id', eventId)
+        .single()
+      
+      if (error) throw error
+      return data as Event
+    },
+    enabled: !!eventId
+  })
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 space-y-4">
+        <div className="w-full max-w-2xl aspect-video bg-muted animate-pulse rounded-xl" />
+        <div className="w-full max-w-2xl h-32 bg-muted animate-pulse rounded-xl" />
+      </div>
+    )
+  }
 
   if (!event) {
     return (
@@ -73,6 +63,8 @@ export default function EventDetailPage() {
       </div>
     )
   }
+
+  const startDate = new Date(event.start_time)
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -91,13 +83,20 @@ export default function EventDetailPage() {
       <div className="p-4 space-y-6 max-w-2xl mx-auto">
         {/* Banner Image */}
         <div className="relative aspect-video w-full rounded-xl overflow-hidden shadow-lg border border-white/10">
-          <Image
-            src={event.image}
-            alt={event.title}
-            fill
-            className="object-cover"
-            priority
-          />
+          {event.image_url ? (
+             <Image
+             src={event.image_url}
+             alt={event.title}
+             fill
+             className="object-cover"
+             priority
+           />
+          ) : (
+             <div className="w-full h-full bg-secondary flex items-center justify-center">
+                <Calendar className="h-16 w-16 text-muted-foreground/50" />
+             </div>
+          )}
+         
           {event.status && (
             <div className="absolute top-3 right-3">
               <Badge className="bg-primary hover:bg-primary text-white border-none shadow-md backdrop-blur-sm">
@@ -112,8 +111,8 @@ export default function EventDetailPage() {
             <div className="space-y-4 bg-card rounded-xl p-5 border border-border">
               <div>
                 <h2 className="text-lg font-semibold mb-2 text-foreground">About the Event</h2>
-                <p className="text-muted-foreground leading-relaxed">
-                  {event.description}
+                <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                  {event.description || 'No description provided.'}
                 </p>
               </div>
               
@@ -124,7 +123,7 @@ export default function EventDetailPage() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-foreground">Date</p>
-                    <p className="text-sm text-muted-foreground">{event.date}</p>
+                    <p className="text-sm text-muted-foreground">{format(startDate, 'EEEE, MMMM do, yyyy')}</p>
                   </div>
                 </div>
                 
@@ -134,7 +133,7 @@ export default function EventDetailPage() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-foreground">Time</p>
-                    <p className="text-sm text-muted-foreground">{event.time}</p>
+                    <p className="text-sm text-muted-foreground">{format(startDate, 'h:mm a')}</p>
                   </div>
                 </div>
                 
@@ -144,8 +143,7 @@ export default function EventDetailPage() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-foreground">Location</p>
-                    <p className="text-sm text-muted-foreground">{event.location}</p>
-                    <p className="text-xs text-muted-foreground/70 mt-0.5">{event.address}</p>
+                    <p className="text-sm text-muted-foreground">{event.location || 'Location to be announced'}</p>
                   </div>
                 </div>
               </div>
@@ -153,9 +151,25 @@ export default function EventDetailPage() {
 
             {/* Action Buttons */}
             <div className="flex gap-3">
-              <Button size="lg" className="flex-1 font-semibold text-base shadow-lg animate-in fade-in transition-all active:scale-[0.98]">
-                Join Event
-              </Button>
+              {event.registration_link && (
+                  <Button 
+                    size="lg" 
+                    className="flex-1 font-semibold text-base shadow-lg animate-in fade-in transition-all active:scale-[0.98]"
+                    onClick={() => window.open(event.registration_link!, '_blank')}
+                  >
+                    Join / Register
+                  </Button>
+              )}
+               {!event.registration_link && (
+                  <Button 
+                    size="lg" 
+                    disabled
+                    className="flex-1 font-semibold text-base shadow-lg opacity-50 cursor-not-allowed"
+                  >
+                    Registration Closed
+                  </Button>
+              )}
+
               <Button variant="outline" size="icon" className="h-12 w-12 shrink-0 border-white/20 bg-white/5 hover:bg-white/10">
                 <Share2 className="h-5 w-5" />
               </Button>
@@ -165,3 +179,4 @@ export default function EventDetailPage() {
     </div>
   )
 }
+

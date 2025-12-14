@@ -22,7 +22,7 @@ export function PostContentRenderer({ content, className }: PostContentRendererP
     content: content,
     editorProps: {
       attributes: {
-        class: 'prose prose-sm prose-invert max-w-none focus:outline-none',
+        class: 'prose prose-sm prose-invert max-w-none focus:outline-none [&_img]:max-h-[500px] [&_img]:w-full [&_img]:object-contain [&_img]:rounded-lg',
       },
     },
     immediatelyRender: false, 

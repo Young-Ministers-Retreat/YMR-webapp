@@ -2,13 +2,14 @@ import { CommentSection } from '@/components/community/Comments/CommentSection';
 import { Post } from '@/types/community';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Heart, MessageCircle, Share2, MoreVertical, Pin, Send, Image as ImageIcon, X } from 'lucide-react';
+import { Heart, MessageCircle, Share2, MoreVertical, Pin, Send, Image as ImageIcon, X, Play } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useState, useRef, useEffect } from 'react';
 import { PostContentRenderer } from './PostContentRenderer';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-import { useComments } from '@/hooks/community/useComments'; // Assuming this hook exists or I should use it for the quick comment input
+import { useComments } from '@/hooks/community/useComments'; 
+import { CommentInput } from '@/components/community/Comments/CommentInput';
 
 // Simplified Avatar
 const UserAvatar = ({ src, name }: { src?: string | null, name?: string | null }) => (
@@ -31,9 +32,7 @@ export function PostCard({ post, defaultShowComments = false }: PostCardProps) {
   const [showReadMore, setShowReadMore] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   
-  // Quick comment state
-  const [quickComment, setQuickComment] = useState('');
-  const { addComment } = useComments(post.id); // Assuming hook can be used here. If not, I might need to move this logic.
+  const { addComment } = useComments(post.id);
 
   const handleLike = () => {
     setIsLiked(!isLiked);
@@ -43,20 +42,11 @@ export function PostCard({ post, defaultShowComments = false }: PostCardProps) {
 
   useEffect(() => {
     if (contentRef.current) {
-        // 200px is roughly line-clamp-3 height for standard text, adjust as needed or use line-clamp logic check
         if (contentRef.current.scrollHeight > 150) { 
             setShowReadMore(true);
         }
     }
   }, [post.content]);
-
-  const handleQuickCommentSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!quickComment.trim()) return;
-    await addComment.mutateAsync({ content: quickComment });
-    setQuickComment('');
-    setShowComments(true); // Open comments to show the new one
-  };
 
   return (
     <Card className="mb-4 overflow-hidden border rounded-xl bg-[#17302E] shadow-sm">
@@ -103,6 +93,35 @@ export function PostCard({ post, defaultShowComments = false }: PostCardProps) {
              )}
          </div>
 
+         {/* Media Grid */}
+         {post.media && post.media.length > 0 && (
+             <div className={cn("mt-4 grid gap-2", 
+                 post.media.length === 1 ? "grid-cols-1" : 
+                 post.media.length === 2 ? "grid-cols-2" : 
+                 "grid-cols-2" // simplified grid for now
+             )}>
+                 {post.media.map((media, idx) => (
+                    <div key={media.id || idx} className={cn("relative rounded-lg overflow-hidden bg-black/40", 
+                        post.media && post.media.length === 3 && idx === 0 ? "col-span-2 aspect-[2/1]" : "aspect-square"
+                    )}>
+                        {media.media_type === 'video' ? (
+                            <video 
+                                src={media.url} 
+                                className="w-full h-full object-cover" 
+                                controls 
+                            />
+                        ) : (
+                            <img 
+                                src={media.url} 
+                                alt="Post media" 
+                                className="w-full h-full object-cover" 
+                            />
+                        )}
+                    </div>
+                 ))}
+             </div>
+         )}
+
       </CardContent>
       
       <CardFooter className="flex-col p-0 bg-transparent">
@@ -121,33 +140,19 @@ export function PostCard({ post, defaultShowComments = false }: PostCardProps) {
             </div>
         </div>
         
-        {/* Quick Comment Input */}
+        {/* Main Comment Input (Formerly Quick Comment) */}
         <div className="w-full px-4 pb-4">
-             <form onSubmit={handleQuickCommentSubmit} className="relative flex items-center gap-2">
-                <Avatar className="h-8 w-8">
-                     {/* Current user avatar would go here, using generic fallback for now */}
-                    <AvatarFallback className="text-xs">U</AvatarFallback>
-                </Avatar>
-                <div className="flex-1 relative">
-                    <input 
-                        type="text" 
-                        value={quickComment}
-                        onChange={(e) => setQuickComment(e.target.value)}
+             <div className="flex">
+                <div className="flex-1">
+                    <CommentInput 
+                        onSubmit={async (content) => {
+                             await addComment.mutateAsync({ content });
+                             setShowComments(true);
+                        }}
                         placeholder="Write a comment..."
-                        className="w-full h-9 bg-neutral-900/50 border border-neutral-700/50 rounded-full pl-4 pr-10 text-sm text-neutral-200 placeholder:text-neutral-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all"
                     />
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                         <Button type="button" size="icon" variant="ghost" className="h-6 w-6 rounded-full text-neutral-400 hover:text-neutral-200">
-                            <ImageIcon className="h-3.5 w-3.5" />
-                         </Button>
-                    </div>
                 </div>
-                 {quickComment && (
-                    <Button type="submit" size="icon" variant="ghost" className="h-8 w-8 rounded-full text-blue-400 hover:bg-blue-400/10">
-                        <Send className="h-4 w-4" />
-                    </Button>
-                 )}
-             </form>
+             </div>
         </div>
 
         {showComments && (

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Play, Download, Calendar, Search, Filter, Loader2 } from 'lucide-react'
 import Image from 'next/image'
+import Link from 'next/link'
 
 interface Sermon {
   id: string
@@ -144,16 +145,15 @@ export default function SermonsPage() {
           </div>
         )}
 
-        {filteredSermons.map(sermon => {
+        {filteredSermons.map((sermon, index) => {
           const thumbnail = sermon.thumbnail_url || getYouTubeThumbnail(sermon.media_url)
           
           return (
-            <a 
+            <Link 
               key={sermon.id}
-              href={sermon.media_url} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="block"
+              href={`/sermons/${sermon.id}`}
+              className="block animate-sermon-slide-in"
+              style={{ animationDelay: `${index * 50}ms` }}
             >
               <div className="flex gap-3 p-0 hover:bg-white/5 transition-colors rounded-lg">
                 {/* Thumbnail */}
@@ -195,7 +195,7 @@ export default function SermonsPage() {
                   </p>
                 </div>
               </div>
-            </a>
+            </Link>
           )
         })}
       </div>

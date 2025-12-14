@@ -71,7 +71,12 @@ export function FeaturedCarouselSkeleton() {
 export function FeaturedCarousel({ items }: FeaturedCarouselProps) {
   const [emblaRef, emblaApi] = useEmblaCarousel(
     { loop: true },
-    [Autoplay({ delay: 5000, stopOnInteraction: true })]
+    [Autoplay({ 
+      delay: 5000, 
+      stopOnInteraction: false, // Continue looping after interaction
+      stopOnMouseEnter: true,   // Pause when hovering
+      stopOnFocusIn: true        // Pause when focused
+    })]
   )
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [scrollSnaps, setScrollSnaps] = useState<number[]>([])
